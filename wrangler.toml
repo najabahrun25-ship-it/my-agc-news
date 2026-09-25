@@ -1,1 +1,14 @@
+name = "agc-news-bot"
+main = "main.py"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["python_workers"]
 
+# Atur jadwal otomatis bot berjalan (Contoh: Setiap 3 jam sekali)
+[triggers]
+crons = ["0 */3 * * *"]
+
+# Hubungkan ke Cloudflare D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "agc-database"
+database_id = "3146a626-35d1-427c-93ad-13d86d9a8287"
