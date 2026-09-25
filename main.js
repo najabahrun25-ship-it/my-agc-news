@@ -3,6 +3,14 @@ export default {
     try {
       const url = new URL(request.url);
 
+      // Endpoint manual untuk memicu pengambilan berita via browser
+      if (url.pathname === "/run-cron") {
+        await fetchNews(env);
+        return new Response("Berhasil memicu pengambilan berita! <a href='/'>Kembali ke Beranda</a>", {
+          headers: { "Content-Type": "text/html;charset=UTF-8" },
+        });
+      }
+
       // Halaman Utama / Beranda
       if (url.pathname === "/" || url.pathname === "/index" || url.pathname === "") {
         try {
@@ -30,11 +38,13 @@ export default {
                     h1 { color: #333; }
                     ul { padding-left: 20px; }
                     li { margin-bottom: 12px; }
+                    .btn { display: inline-block; background: #0066cc; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; margin-bottom: 20px; }
                 </style>
             </head>
             <body>
                 <h1>📰 AGC News AI Terbaru</h1>
                 <p>Website berita otomatis berbasis Cloudflare Workers & D1 Database.</p>
+                <a class="btn" href="/run-cron" target="_blank">🔄 Tarik Berita Baru Sekarang</a>
                 <hr>
                 <ul>${htmlList}</ul>
             </body>
@@ -99,42 +109,40 @@ export default {
     }
   },
 
-  // Cron Trigger Otomatis untuk Mengambil Berita US
   async scheduled(event, env, ctx) {
-    console.log("Cron trigger berjalan: Mengambil berita US...");
-    
-    try {
-      const rssUrl = "https://rss.cnn.com/rss/edition_us.rss";
-      const response = await fetch(rssUrl);
-      const xmlText = await response.text();
-
-      const titleMatch = xmlText.match(/<item>.*?<title>(.*?)<\/title>.*?<link>(.*?)<\/link>/s);
-      
-      if (titleMatch) {
-        let title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-        let sourceUrl = titleMatch[2].trim();
-        
-        let slug = title.toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, '')
-          .replace(/[\s-]+/g, '-')
-          .trim();
-
-        let content = `<p>Berita otomatis terkini dari Amerika Serikat.</p><p>Sumber berita asli: <a href="${sourceUrl}" target="_blank" rel="nofollow">Baca selengkapnya</a></p>`;
-
-        const existing = await env.DB.prepare("SELECT id FROM articles WHERE slug = ?").bind(slug).first();
-        
-        if (!existing) {
-          await env.DB.prepare(
-            "INSERT INTO articles (title, slug, content, source_url) VALUES (?, ?, ?, ?)"
-          ).bind(title, slug, content, sourceUrl).run();
-          
-          console.log(`Berhasil menyimpan berita US baru: ${title}`);
-        } else {
-          console.log("Berita sudah ada di database, melewati...");
-        }
-      }
-    } catch (err) {
-      console.error("Gagal menjalankan cron berita:", err.message);
-    }
+    await fetchNews(env);
   }
 };
+
+// Fungsi terpusat untuk mengambil berita US
+async function fetchNews(env) {
+  try {
+    const rssUrl = "https://rss.cnn.com/rss/edition_us.rss";
+    const response = await fetch(rssUrl);
+    const xmlText = await response.text();
+
+    const titleMatch = xmlText.match(/<item>.*?<title>(.*?)<\/title>.*?<link>(.*?)<\/link>/s);
+    
+    if (titleMatch) {
+      let title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+      let sourceUrl = titleMatch[2].trim();
+      
+      let slug = title.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/[\s-]+/g, '-')
+        .trim();
+
+      let content = `<p>Berita otomatis terkini dari Amerika Serikat.</p><p>Sumber berita asli: <a href="${sourceUrl}" target="_blank" rel="nofollow">Baca selengkapnya</a></p>`;
+
+      const existing = await env.DB.prepare("SELECT id FROM articles WHERE slug = ?").bind(slug).first();
+      
+      if (!existing) {
+        await env.DB.prepare(
+          "INSERT INTO articles (title, slug, content, source_url) VALUES (?, ?, ?, ?)"
+        ).bind(title, slug, content, sourceUrl).run();
+      }
+    }
+  } catch (err) {
+    console.error("Gagal mengambil berita:", err.message);
+  }
+}
