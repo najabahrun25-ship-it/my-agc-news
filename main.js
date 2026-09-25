@@ -3,10 +3,51 @@ export default {
     try {
       const url = new URL(request.url);
 
-      // Endpoint manual untuk memicu pengambilan berita via browser
+      // Endpoint manual untuk memicu pengambilan berita via browser dan menampilkan status errornya
       if (url.pathname === "/run-cron") {
-        await fetchNews(env);
-        return new Response("Berhasil memicu pengambilan berita! <a href='/'>Kembali ke Beranda</a>", {
+        let logMessage = "";
+        try {
+          const rssUrl = "https://rss.cnn.com/rss/edition_us.rss";
+          const response = await fetch(rssUrl);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const xmlText = await response.text();
+          logMessage += `Berhasil mengambil RSS (Panjang teks: ${xmlText.length}).<br>`;
+
+          const titleMatch = xmlText.match(/<item>.*?<title>(.*?)<\/title>.*?<link>(.*?)<\/link>/s);
+          
+          if (titleMatch) {
+            let title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+            let sourceUrl = titleMatch[2].trim();
+            
+            let slug = title.toLowerCase()
+              .replace(/[^a-z0-9\s-]/g, '')
+              .replace(/[\s-]+/g, '-')
+              .trim();
+
+            let content = `<p>Berita otomatis terkini dari Amerika Serikat.</p><p>Sumber berita asli: <a href="${sourceUrl}" target="_blank" rel="nofollow">Baca selengkapnya</a></p>`;
+
+            const existing = await env.DB.prepare("SELECT id FROM articles WHERE slug = ?").bind(slug).first();
+            
+            if (!existing) {
+              await env.DB.prepare(
+                "INSERT INTO articles (title, slug, content, source_url) VALUES (?, ?, ?, ?)"
+              ).bind(title, slug, content, sourceUrl).run();
+              logMessage += `<b>Sukses menyimpan berita:</b> ${title}<br>`;
+            } else {
+              logMessage += `Berita sudah ada di database (duplikat).<br>`;
+            }
+          } else {
+            logMessage += `Gagal mencocokkan pola XML RSS.<br>`;
+          }
+        } catch (err) {
+          logMessage += `<b>Error saat fetch:</b> ${err.message}<br>`;
+        }
+
+        return new Response(`<h3>Log Eksekusi Cron:</h3><p>${logMessage}</p><a href='/'>Kembali ke Beranda</a>`, {
           headers: { "Content-Type": "text/html;charset=UTF-8" },
         });
       }
@@ -110,39 +151,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    await fetchNews(env);
+    // Cron otomatis menggunakan URL yang sama
+    // (Opsional bisa dibiarkan atau disesuaikan)
   }
 };
-
-// Fungsi terpusat untuk mengambil berita US
-async function fetchNews(env) {
-  try {
-    const rssUrl = "https://rss.cnn.com/rss/edition_us.rss";
-    const response = await fetch(rssUrl);
-    const xmlText = await response.text();
-
-    const titleMatch = xmlText.match(/<item>.*?<title>(.*?)<\/title>.*?<link>(.*?)<\/link>/s);
-    
-    if (titleMatch) {
-      let title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-      let sourceUrl = titleMatch[2].trim();
-      
-      let slug = title.toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/[\s-]+/g, '-')
-        .trim();
-
-      let content = `<p>Berita otomatis terkini dari Amerika Serikat.</p><p>Sumber berita asli: <a href="${sourceUrl}" target="_blank" rel="nofollow">Baca selengkapnya</a></p>`;
-
-      const existing = await env.DB.prepare("SELECT id FROM articles WHERE slug = ?").bind(slug).first();
-      
-      if (!existing) {
-        await env.DB.prepare(
-          "INSERT INTO articles (title, slug, content, source_url) VALUES (?, ?, ?, ?)"
-        ).bind(title, slug, content, sourceUrl).run();
-      }
-    }
-  } catch (err) {
-    console.error("Gagal mengambil berita:", err.message);
-  }
-}
