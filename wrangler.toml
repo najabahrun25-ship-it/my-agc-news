@@ -1,9 +1,8 @@
 name = "agc-news-bot"
-main = "main.py"
+main = "main.js"
 compatibility_date = "2024-03-20"
-compatibility_flags = ["python_workers"]
 
-# Atur jadwal otomatis bot berjalan (Contoh: Setiap 3 jam sekali)
+# Atur jadwal otomatis bot berjalan (Setiap 3 jam sekali)
 [triggers]
 crons = ["0 */3 * * *"]
 
