@@ -1,1 +1,8 @@
-
+CREATE TABLE IF NOT EXISTS articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    content TEXT NOT NULL,
+    source_url TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
