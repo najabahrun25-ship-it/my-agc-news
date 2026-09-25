@@ -7,8 +7,13 @@ export default {
       if (url.pathname === "/run-cron") {
         let logMessage = "";
         try {
-          const rssUrl = "https://rss.cnn.com/rss/edition_us.rss";
-          const response = await fetch(rssUrl);
+          // Menggunakan Yahoo News RSS yang lebih terbuka untuk fetch Cloudflare Workers
+          const rssUrl = "https://news.yahoo.com/rss/";
+          const response = await fetch(rssUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          });
           
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -151,7 +156,6 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    // Cron otomatis menggunakan URL yang sama
-    // (Opsional bisa dibiarkan atau disesuaikan)
+    // Cron otomatis
   }
 };
